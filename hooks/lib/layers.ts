@@ -30,7 +30,7 @@ export interface Layer {
   post?: (ctx: LayerContext) => Promise<void>;
 }
 
-const BICEP_BASE = "../azure-cdk/packages/demo/qa-bot/output/bicep";
+const BICEP_BASE = "../infra";
 
 export const INFRA_LAYERS: Layer[] = [
   // ── Layer 1: Shared resources ──────────────────────────────────────────────

@@ -78,8 +78,7 @@ function checkResourceGroup(): void {
 
 // ── Step 4: Verify bicep source files ──────────────────────────────────────────
 function verifyBicepSources(): void {
-  const bicepDir =
-    "../azure-cdk/packages/demo/qa-bot/output/bicep";
+  const bicepDir = "infra";
 
   log(`Verifying bicep sources in '${bicepDir}'...`);
 
