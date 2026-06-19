@@ -1,0 +1,19 @@
+{
+  "name": "qa-bot-azd-hooks",
+  "version": "1.0.0",
+  "description": "azd lifecycle hooks for QA Bot chatbot deployment",
+  "private": true,
+  "scripts": {
+    "preprovision": "tsx hooks/preprovision.ts",
+    "postprovision": "tsx hooks/postprovision.ts",
+    "predeploy": "tsx hooks/predeploy.ts",
+    "postdeploy": "tsx hooks/postdeploy.ts",
+    "predown": "tsx hooks/predown.ts",
+    "postdown": "tsx hooks/postdown.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

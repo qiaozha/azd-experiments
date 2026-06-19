@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: qa-bot
+metadata:
+  template: qa-bot@0.0.1
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+# ── Application services ───────────────────────────────────────────────────────
+# Only layers that run application code are declared here.
+# The infra-only layers (shared-resources, agent, backend, logic-app) are
+# deployed by the postprovision hook via the lib/layers.ts pipeline.
+services:
+  frontend:
+    # Teams bot — App Service running the bot Docker container.
+    # azd deploy frontend  →  pushes new image and restarts the App Service.
+    project: ../azure-cdk/packages/demo/qa-bot
+    language: ts
+    host: appservice
+    hooks:
+      predeploy:
+        - shell: sh
+          run: npx tsx hooks/frontend-predeploy.ts
+          interactive: true
+          continueOnError: false
+      postdeploy:
+        - shell: sh
+          run: npx tsx hooks/frontend-postdeploy.ts
+          interactive: true
+          continueOnError: false
+
+  function-app:
+    # Azure Function — processes queue messages and background jobs.
+    # azd deploy function-app  →  pushes new image and restarts the Function App.
+    project: ../azure-cdk/packages/demo/qa-bot
+    language: ts
+    host: function
+    hooks:
+      predeploy:
+        - shell: sh
+          run: npx tsx hooks/function-predeploy.ts
+          interactive: true
+          continueOnError: false
+      postdeploy:
+        - shell: sh
+          run: npx tsx hooks/function-postdeploy.ts
+          interactive: true
+          continueOnError: false
+
+# ── Global lifecycle hooks ─────────────────────────────────────────────────────
+hooks:
+  # ── Pre-provision: runs before 'azd provision' ────────────────────────────
+  preprovision:
+    - shell: sh
+      run: npx tsx hooks/preprovision.ts
+      interactive: true
+      continueOnError: false
+
+  # ── Post-provision: runs the infra-only layer pipeline ────────────────────
+  # Deploys: shared-resources → agent → backend → logic-app
+  # Set DEPLOY_LAYER=<name> to run a single layer only.
+  postprovision:
+    - shell: sh
+      run: npx tsx hooks/postprovision.ts
+      interactive: true
+      continueOnError: false
+
+  # ── Pre-deploy: global guard before any 'azd deploy' ─────────────────────
+  predeploy:
+    - shell: sh
+      run: npx tsx hooks/predeploy.ts
+      interactive: true
+      continueOnError: false
+
+  # ── Post-deploy: global cleanup after any 'azd deploy' ───────────────────
+  postdeploy:
+    - shell: sh
+      run: npx tsx hooks/postdeploy.ts
+      interactive: true
+      continueOnError: false
+
+  # ── Pre-down: runs before 'azd down' ──────────────────────────────────────
+  predown:
+    - shell: sh
+      run: npx tsx hooks/predown.ts
+      interactive: true
+      continueOnError: false
+
+  # ── Post-down: runs after 'azd down' ──────────────────────────────────────
+  postdown:
+    - shell: sh
+      run: npx tsx hooks/postdown.ts
+      interactive: true
+      continueOnError: false
