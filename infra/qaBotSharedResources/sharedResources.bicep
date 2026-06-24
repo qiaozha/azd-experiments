@@ -1,26 +1,10 @@
 targetScope = 'resourceGroup'
 
+// User-assigned managed identity for the QA bot app. Its principalId (Entra object ID)
+// is referenced below to grant the app data-plane access to Cosmos DB.
 resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2025-05-31-preview' = {
   name: 'qzqabot-identity'
   location: 'westus2'
-}
-
-resource workspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' = {
-  name: 'qzqabot-log'
-  location: 'westus2'
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    features: {
-      enableLogAccessUsingOnlyResourcePermissions: true
-    }
-    workspaceCapping: {
-      dailyQuotaGb: -1
-    }
-    publicNetworkAccessForIngestion: 'Enabled'
-    publicNetworkAccessForQuery: 'Enabled'
-  }
 }
 
 resource actionGroup 'Microsoft.Insights/actionGroups@2024-10-01-preview' = {
@@ -28,6 +12,7 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2024-10-01-preview' = {
   location: 'Global'
   properties: {
     groupShortName: 'Alert'
+    enabled: true
     emailReceivers: [
       {
         name: 'Email0_-EmailAction-'
@@ -127,6 +112,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2026-04-01' = {
     allowSharedKeyAccess: false
     largeFileSharesState: 'Enabled'
     networkAcls: {
+      defaultAction: 'Allow'
       virtualNetworkRules: []
       ipRules: []
     }
@@ -209,16 +195,6 @@ resource container3 'Microsoft.Storage/storageAccounts/blobServices/containers@2
 
 resource container4 'Microsoft.Storage/storageAccounts/blobServices/containers@2026-04-01' = {
   name: 'knowledge'
-  parent: blobService
-  properties: {
-    defaultEncryptionScope: '$account-encryption-key'
-    denyEncryptionScopeOverride: false
-    publicAccess: 'None'
-  }
-}
-
-resource container5 'Microsoft.Storage/storageAccounts/blobServices/containers@2026-04-01' = {
-  name: 'records'
   parent: blobService
   properties: {
     defaultEncryptionScope: '$account-encryption-key'
@@ -432,133 +408,214 @@ resource container9 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
   }
 }
 
-resource sqlRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2026-03-15' = {
-  name: '00000000-0000-0000-0000-000000000001'
-  parent: databaseAccount
+// ============================================================================
+// Azure RBAC role assignments
+// ----------------------------------------------------------------------------
+// Principals:
+//   userAssignedIdentity.properties.principalId -> qzqabot-identity (app runtime)
+//   developerGroupObjectId                       -> AzureSDKChatBot_Developer group
+//
+// ============================================================================
+
+// AzureSDKChatBot_Developer Entra group object ID.
+var developerGroupObjectId = '2efb50ed-0ca9-4cf1-b43b-9b31a87e08f5'
+
+// Built-in role definition IDs.
+// Azure RBAC roles are referenced via subscriptionResourceId(...).
+// cosmosDbDataContributor is a Cosmos DB data-plane role (built-in, auto-created
+// by Azure) referenced via the account's sqlRoleDefinitions, not Azure RBAC.
+var roleIds = {
+  storageBlobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+  storageBlobDataContributor: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  storageQueueDataContributor: '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+  storageTableDataContributor: '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+  keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
+  keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+  appConfigurationDataReader: '516239f1-63e1-4d78-a4de-a74fb236a071'
+  searchIndexDataContributor: '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
+  contributor: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+  cosmosDbDataContributor: '00000000-0000-0000-0000-000000000002'
+}
+
+// --- Managed identity (qzqabot-identity) ------------------------------------
+
+// Blob read/write/delete for app runtime data.
+resource identityStorageBlobOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, userAssignedIdentity.id, roleIds.storageBlobDataOwner)
+  scope: storageAccount
   properties: {
-    roleName: 'Cosmos DB Built-in Data Reader'
-    type: 'BuiltInRole'
-    assignableScopes: [
-      databaseAccount.id
-    ]
-    permissions: [
-      {
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/executeQuery'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/readChangeFeed'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/read'
-        ]
-        notDataActions: []
-      }
-    ]
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataOwner)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
-resource sqlRoleDefinition2 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2026-03-15' = {
-  name: '00000000-0000-0000-0000-000000000002'
-  parent: databaseAccount
+// Queue access for app runtime.
+resource identityStorageQueueContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, userAssignedIdentity.id, roleIds.storageQueueDataContributor)
+  scope: storageAccount
   properties: {
-    roleName: 'Cosmos DB Built-in Data Contributor'
-    type: 'BuiltInRole'
-    assignableScopes: [
-      databaseAccount.id
-    ]
-    permissions: [
-      {
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-        ]
-        notDataActions: []
-      }
-    ]
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageQueueDataContributor)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
-resource sqlRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2026-03-15' = {
-  name: '19f1f6af-0515-4660-afdb-e3b5a7001e67'
-  parent: databaseAccount
+// Table access for Teams channel conversation tables.
+resource identityStorageTableContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, userAssignedIdentity.id, roleIds.storageTableDataContributor)
+  scope: storageAccount
   properties: {
-    roleDefinitionId: sqlRoleDefinition2.id
-    principalId: 'd14612b2-da23-4c06-ab30-88b5d65dae0c'
-    scope: databaseAccount.id
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageTableDataContributor)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
+// Read secrets from Key Vault at runtime.
+resource identityKeyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(vault.id, userAssignedIdentity.id, roleIds.keyVaultSecretsUser)
+  scope: vault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.keyVaultSecretsUser)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Read configuration values from App Configuration.
+resource identityAppConfigDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(configurationStore.id, userAssignedIdentity.id, roleIds.appConfigurationDataReader)
+  scope: configurationStore
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.appConfigurationDataReader)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Read/write the search index.
+resource identitySearchIndexContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(searchService.id, userAssignedIdentity.id, roleIds.searchIndexDataContributor)
+  scope: searchService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.searchIndexDataContributor)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Manage the container registry (push/pull/admin).
+resource identityAcrContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registry.id, userAssignedIdentity.id, roleIds.contributor)
+  scope: registry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.contributor)
+    principalId: userAssignedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Read/write Cosmos DB data at runtime (Cosmos data-plane role).
 resource sqlRoleAssignment2 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2026-03-15' = {
-  name: '6e24aed8-31e5-4705-9bc1-a882a89703e9'
+  name: guid(databaseAccount.id, userAssignedIdentity.id, roleIds.cosmosDbDataContributor)
   parent: databaseAccount
   properties: {
-    roleDefinitionId: sqlRoleDefinition2.id
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
+    roleDefinitionId: '${databaseAccount.id}/sqlRoleDefinitions/${roleIds.cosmosDbDataContributor}'
+    principalId: userAssignedIdentity.properties.principalId
     scope: databaseAccount.id
   }
 }
 
-resource tableRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/tableRoleDefinitions@2026-03-15' = {
-  name: '00000000-0000-0000-0000-000000000001'
-  parent: databaseAccount
+// --- AzureSDKChatBot_Developer group ----------------------------------------
+
+// Blob read/write for developers.
+resource developerStorageBlobContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, developerGroupObjectId, roleIds.storageBlobDataContributor)
+  scope: storageAccount
   properties: {
-    roleName: 'Cosmos DB Built-in Data Reader'
-    type: 'BuiltInRole'
-    assignableScopes: [
-      databaseAccount.id
-    ]
-    permissions: [
-      {
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/tables/containers/executeQuery'
-          'Microsoft.DocumentDB/databaseAccounts/tables/containers/readChangeFeed'
-          'Microsoft.DocumentDB/databaseAccounts/tables/containers/entities/read'
-        ]
-        notDataActions: []
-      }
-    ]
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataContributor)
+    principalId: developerGroupObjectId
+    principalType: 'Group'
   }
 }
 
-resource tableRoleDefinition2 'Microsoft.DocumentDB/databaseAccounts/tableRoleDefinitions@2026-03-15' = {
-  name: '00000000-0000-0000-0000-000000000002'
-  parent: databaseAccount
+// Read configuration values from App Configuration.
+resource developerAppConfigDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(configurationStore.id, developerGroupObjectId, roleIds.appConfigurationDataReader)
+  scope: configurationStore
   properties: {
-    roleName: 'Cosmos DB Built-in Data Contributor'
-    type: 'BuiltInRole'
-    assignableScopes: [
-      databaseAccount.id
-    ]
-    permissions: [
-      {
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/tables/*'
-          'Microsoft.DocumentDB/databaseAccounts/tables/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/tables/containers/entities/*'
-        ]
-        notDataActions: []
-      }
-    ]
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.appConfigurationDataReader)
+    principalId: developerGroupObjectId
+    principalType: 'Group'
   }
 }
 
-resource tableRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/tableRoleAssignments@2026-03-15' = {
-  name: '2af1f6af-0515-4660-afdb-e3b5a7001e68'
+// Manage Key Vault secrets for developers.
+resource developerKeyVaultSecretsOfficer 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(vault.id, developerGroupObjectId, roleIds.keyVaultSecretsOfficer)
+  scope: vault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.keyVaultSecretsOfficer)
+    principalId: developerGroupObjectId
+    principalType: 'Group'
+  }
+}
+
+// Manage the container registry for developers.
+resource developerAcrContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registry.id, developerGroupObjectId, roleIds.contributor)
+  scope: registry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.contributor)
+    principalId: developerGroupObjectId
+    principalType: 'Group'
+  }
+}
+
+// Read/write Cosmos DB data for developers (Cosmos data-plane role).
+resource sqlRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2026-03-15' = {
+  name: guid(databaseAccount.id, developerGroupObjectId, roleIds.cosmosDbDataContributor)
   parent: databaseAccount
   properties: {
-    roleDefinitionId: tableRoleDefinition2.id
-    principalId: 'd14612b2-da23-4c06-ab30-88b5d65dae0c'
+    roleDefinitionId: '${databaseAccount.id}/sqlRoleDefinitions/${roleIds.cosmosDbDataContributor}'
+    principalId: developerGroupObjectId
     scope: databaseAccount.id
   }
 }
 
-resource tableRoleAssignment2 'Microsoft.DocumentDB/databaseAccounts/tableRoleAssignments@2026-03-15' = {
-  name: '7e35aed8-31e5-4705-9bc1-a882a89703ea'
-  parent: databaseAccount
-  properties: {
-    roleDefinitionId: tableRoleDefinition2.id
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    scope: databaseAccount.id
-  }
-}
+// Output
+output managedIdentityName string = userAssignedIdentity.name
+output storageAccountName string = storageAccount.name
+
+@description('Primary blob service endpoint of the shared storage account.')
+output storageBlobEndpoint string = storageAccount.properties.primaryEndpoints.blob
+@description('Container registry resource name ')
+output containerRegistryName string = registry.name
+
+@description('Client ID of the user-assigned managed identity (qzqabot-identity).')
+output managedIdentityClientId string = userAssignedIdentity.properties.clientId
+
+@description('Resource ID of the user-assigned managed identity (qzqabot-identity).')
+output managedIdentityResourceId string = userAssignedIdentity.id
+
+@description('Principal (object) ID of the user-assigned managed identity (qzqabot-identity).')
+output managedIdentityPrincipalId string = userAssignedIdentity.properties.principalId
+
+@description('Container registry login server')
+output containerRegistryLoginServer string = registry.properties.loginServer
+
+@description('Key Vault name.')
+output keyVaultName string = vault.name
+
+@description('App Configuration store name.')
+output appConfigName string = configurationStore.name
+
+@description('Azure AI Search service name.')
+output searchServiceName string = searchService.name
+
+@description('Cosmos DB account name.')
+output cosmosDbAccountName string = databaseAccount.name
+
+@description('Shared action group name.')
+output actionGroupName string = actionGroup.name

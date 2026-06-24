@@ -4,15 +4,14 @@
  * Runs before `azd deploy function-app`.
  *
  * Responsibilities:
- *   - Log in to the backend Container Registry (azuresdkqabotcontainer)
+ *   - Log in to the backend Container Registry (qzqabotcontainer)
  *   - Build the Azure Function Docker image
  *   - Push the image to ACR
  *   - Verify the manifest before the Function App pulls it
  */
 
 import { execSync } from "child_process";
-
-const REGISTRY = "azuresdkqabotcontainer.azurecr.io";
+const REGISTRY = process.env.CONTAINER_REGISTRY_LOGIN_SERVER ?? "qzqabotcontainer.azurecr.io";
 const IMAGE = `${REGISTRY}/azure-sdk-qa-bot-function:latest`;
 const RESOURCE_GROUP = process.env.AZURE_RESOURCE_GROUP ?? "azure-sdk-qa-bot";
 
@@ -25,7 +24,7 @@ function acrLogin(): void {
   log(`Logging in to ACR: ${REGISTRY}`);
 
   // TODO: Authenticate Docker to the backend registry.
-  //   execSync("az acr login --name azuresdkqabotcontainer", { stdio: "inherit" });
+  //   execSync("az acr login --name qzqabotcontainer", { stdio: "inherit" });
 }
 
 // ── Step 2: Build image ───────────────────────────────────────────────────────
@@ -53,7 +52,7 @@ function verifyManifest(): void {
 
   // TODO: Confirm the tag exists in the registry.
   //   const result = execSync(
-  //     "az acr repository show-tags --name azuresdkqabotcontainer --repository azure-sdk-qa-bot-function --output tsv",
+  //     "az acr repository show-tags --name qzqabotcontainer --repository azure-sdk-qa-bot-function --output tsv",
   //     { encoding: "utf8" }
   //   );
   //   if (!result.includes("latest")) throw new Error("Image tag 'latest' not found in ACR.");

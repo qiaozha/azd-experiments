@@ -396,3 +396,8 @@ module azureSdkQaBotModule './azureSdkQaBotModule.bicep' = {
     userAssignedIdentityPropertiesPrincipalId: userAssignedIdentity.properties.principalId
   }
 }
+
+// Outputs
+output botIdentityName string = userAssignedIdentity.name
+output botBaseUrl string = 'https://${site.properties.defaultHostName}'
+output botAudience string = userAssignedIdentity.properties.clientId

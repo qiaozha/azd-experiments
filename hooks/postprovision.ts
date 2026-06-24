@@ -7,7 +7,7 @@
  * with their own per-service hooks.
  *
  * Partial deployment:
- *   DEPLOY_LAYER=agent azd provision   — deploys only the agent layer
+ *   DEPLOY_LAYER=agent-platform azd provision   — deploys only the agent platform layer
  */
 
 import { INFRA_LAYERS } from "./lib/layers.js";
