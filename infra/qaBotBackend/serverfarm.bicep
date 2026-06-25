@@ -1,102 +1,59 @@
 targetScope = 'resourceGroup'
 
-resource registry 'Microsoft.ContainerRegistry/registries@2026-01-01-preview' existing = {
-  name: 'qzqabotcontainer'
-}
+@description('Azure region for all resources.')
+param location string
 
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: registry
-  name: guid(registry.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Full container image reference for the backend service (registry/repository:tag).')
+param ragBasedBackendImage string
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2026-04-01' existing = {
-  name: 'qzqabotstorage'
-}
+@description('Full container image reference for the agent server slot (registry/repository:tag).')
+param agentBasedBackendImage string
 
-resource roleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storageAccount
-  name: guid(storageAccount.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Client ID of the qzqabot-identity managed identity; used by DefaultAzureCredential to select the identity.')
+param managedIdentityClientId string
 
-resource roleAssignment3 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: storageAccount
-  name: guid(storageAccount.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Client ID (audience) of the Entra app registration that fronts the backend, used by App Service authentication (Easy Auth).')
+param serverAudience string
 
-resource vault 'Microsoft.KeyVault/vaults@2026-03-01-preview' existing = {
-  name: 'qzqabot-keyvalut'
-}
+@description('Name of the shared user-assigned managed identity attached to the site and slot.')
+param sharedIdentityName string
 
-resource roleAssignment4 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: vault
-  name: guid(vault.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Name of the frontend/bot user-assigned managed identity also attached to the site and slot.')
+param frontendIdentityName string
 
-resource configurationStore 'Microsoft.AppConfiguration/configurationStores@2025-08-01-preview' existing = {
-  name: 'qzqabot-config'
-}
+@description('Azure AI Services account name the backend talks to.')
+param aiResourceName string
 
-resource roleAssignment5 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: configurationStore
-  name: guid(configurationStore.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '516239f1-63e1-4d78-a4de-a74fb236a071'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '516239f1-63e1-4d78-a4de-a74fb236a071')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Azure AI project name.')
+param aiProjectName string
 
-resource searchService 'Microsoft.Search/searchServices@2026-03-01-preview' existing = {
-  name: 'qzqabot-search'
-}
+@description('Azure AI Search service name.')
+param searchServiceName string
 
-resource roleAssignment6 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: searchService
-  name: guid(searchService.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1407120a-92aa-4202-b7e9-c0e197c71c8f'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '1407120a-92aa-4202-b7e9-c0e197c71c8f')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
-}
+@description('Cosmos DB account name.')
+param cosmosDbAccountName string
 
-resource account 'Microsoft.CognitiveServices/accounts@2026-05-01' existing = {
-  name: 'qzqabot-ai-resource'
-}
+@description('Storage account name.')
+param storageAccountName string
 
-resource roleAssignment7 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: account
-  name: guid(account.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
-    principalId: '5589cee8-16a1-4389-b142-86706adc5c9f'
-    principalType: 'ServicePrincipal'
-  }
+@description('Key Vault name.')
+param keyVaultName string
+
+@description('App Configuration store name.')
+param appConfigName string
+
+@description('Name of the shared action group notified by the metric alerts.')
+param actionGroupName string
+
+// User-assigned identities attached to both the site and the agent slot.
+var siteUserAssignedIdentities = {
+  '${resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', sharedIdentityName)}': {}
+  '${resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', frontendIdentityName)}': {}
 }
 
 resource serverfarm 'Microsoft.Web/serverfarms@2025-05-01' = {
   name: 'azuresdkqabot-appserviceplan'
-  location: 'West US 2'
+  location: location
   properties: {
     reserved: true
   }
@@ -110,40 +67,53 @@ resource serverfarm 'Microsoft.Web/serverfarms@2025-05-01' = {
   kind: 'linux'
 }
 
-resource component 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'azuresdkqabot-server'
-  location: 'westus2'
-  kind: 'web'
+// Log Analytics workspace backing the backend Application Insights components.
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' = {
+  name: 'azuresdkqabot-log'
+  location: location
   properties: {
-    Application_Type: 'web'
-    RetentionInDays: 90
-    WorkspaceResourceId: '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/defaultresourcegroup-wus2/providers/microsoft.operationalinsights/workspaces/defaultworkspace-faa080af-c1d8-40ad-9cce-e1a450ca5b57-wus2'
+    sku: {
+      name: 'PerGB2018'
+    }
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
   }
 }
 
-resource component2 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'azuresdkqabot-server202510300250'
-  location: 'westus2'
+resource serverAppInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'azuresdkqabot-server'
+  location: location
   kind: 'web'
   properties: {
     Application_Type: 'web'
     RetentionInDays: 90
-    WorkspaceResourceId: '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/defaultresourcegroup-wus2/providers/microsoft.operationalinsights/workspaces/defaultworkspace-faa080af-c1d8-40ad-9cce-e1a450ca5b57-wus2'
+    WorkspaceResourceId: workspace.id
+  }
+}
+
+resource slotAppInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'azuresdkqabot-server202510300250'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    RetentionInDays: 90
+    WorkspaceResourceId: workspace.id
   }
 }
 
 resource site 'Microsoft.Web/sites@2025-05-01' = {
   name: 'azuresdkqabot-server'
   tags: {
-    'hidden-link: /app-insights-resource-id': '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/microsoft.insights/components/azuresdkqabot-server202510300250'
+    'hidden-link: /app-insights-resource-id': slotAppInsights.id
   }
-  location: 'West US 2'
+  location: location
   properties: {
     httpsOnly: true
     publicNetworkAccess: 'Enabled'
     serverFarmId: serverfarm.id
     siteConfig: {
-      linuxFxVersion: 'DOCKER|qzqabotcontainer.azurecr.io/azure-sdk-qa-bot-backend:latest'
+      linuxFxVersion: 'DOCKER|${ragBasedBackendImage}'
       alwaysOn: true
       acrUseManagedIdentityCreds: true
       ftpsState: 'FtpsOnly'
@@ -152,61 +122,58 @@ resource site 'Microsoft.Web/sites@2025-05-01' = {
       appSettings: [
         {
           name: 'AZURE_CLIENT_ID'
-          value: ''
+          value: managedIdentityClientId
         }
         {
           name: 'AZURE_TENANT_ID'
-          value: ''
+          value: tenant().tenantId
         }
         {
           name: 'AZURE_SUBSCRIPTION_ID'
-          value: 'faa080af-c1d8-40ad-9cce-e1a450ca5b57'
+          value: subscription().subscriptionId
         }
         {
           name: 'AZURE_RESOURCE_GROUP'
-          value: 'azure-sdk-qa-bot'
+          value: resourceGroup().name
         }
         {
           name: 'AI_PROJECT_NAME'
-          value: 'qzqabot-ai'
+          value: aiProjectName
         }
         {
           name: 'AZURE_AI_RESOURCE_NAME'
-          value: 'qzqabot-ai-resource'
+          value: aiResourceName
         }
         {
           name: 'APP_INSIGHTS_CONNECTION_STRING'
-          value: ''
+          value: slotAppInsights.properties.ConnectionString
         }
         {
           name: 'AZURE_SEARCH_SERVICE_NAME'
-          value: 'qzqabot-search'
+          value: searchServiceName
         }
         {
           name: 'COSMOS_DB_ACCOUNT_NAME'
-          value: 'qzqabot-db'
+          value: cosmosDbAccountName
         }
         {
           name: 'STORAGE_ACCOUNT_NAME'
-          value: 'qzqabotstorage'
+          value: storageAccountName
         }
         {
           name: 'KEY_VAULT_NAME'
-          value: 'qzqabot-keyvalut'
+          value: keyVaultName
         }
         {
           name: 'APP_CONFIG_NAME'
-          value: 'qzqabot-config'
+          value: appConfigName
         }
       ]
     }
   }
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: {
-      '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.ManagedIdentity/userAssignedIdentities/qzqabot-identity': {}
-      '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.ManagedIdentity/userAssignedIdentities/azsdkqabot': {}
-    }
+    userAssignedIdentities: siteUserAssignedIdentities
   }
   kind: 'app,linux,container'
 }
@@ -227,8 +194,8 @@ resource config 'Microsoft.Web/sites/config@2025-05-01' = {
       azureActiveDirectory: {
         enabled: true
         registration: {
-          clientId: ''
-          openIdIssuer: 'https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47/v2.0'
+          clientId: serverAudience
+          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
         }
         login: {
           loginParameters: []
@@ -243,32 +210,19 @@ resource config 'Microsoft.Web/sites/config@2025-05-01' = {
   }
 }
 
-resource sitecontainer 'Microsoft.Web/sites/sitecontainers@2025-05-01' = {
-  name: 'main'
-  parent: site
-  properties: {
-    image: 'mcr.microsoft.com/appsvc/staticsite:latest'
-    targetPort: '80'
-    isMain: true
-    authType: 'Anonymous'
-    volumeMounts: []
-    environmentVariables: []
-  }
-}
-
 resource slot 'Microsoft.Web/sites/slots@2025-05-01' = {
   name: 'agent'
   parent: site
   tags: {
-    'hidden-link: /app-insights-resource-id': '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/microsoft.insights/components/azuresdkqabot-server202510300250'
+    'hidden-link: /app-insights-resource-id': slotAppInsights.id
   }
-  location: 'West US 2'
+  location: location
   properties: {
     serverFarmId: serverfarm.id
     httpsOnly: true
     publicNetworkAccess: 'Enabled'
     siteConfig: {
-      linuxFxVersion: 'DOCKER|qzqabotcontainer.azurecr.io/azure-sdk-qa-bot-agent-server:latest'
+      linuxFxVersion: 'DOCKER|${agentBasedBackendImage}'
       alwaysOn: true
       acrUseManagedIdentityCreds: true
       ftpsState: 'FtpsOnly'
@@ -276,54 +230,51 @@ resource slot 'Microsoft.Web/sites/slots@2025-05-01' = {
       appSettings: [
         {
           name: 'AZURE_CLIENT_ID'
-          value: ''
+          value: managedIdentityClientId
         }
         {
           name: 'AZURE_TENANT_ID'
-          value: ''
+          value: tenant().tenantId
         }
         {
           name: 'AZURE_SUBSCRIPTION_ID'
-          value: 'faa080af-c1d8-40ad-9cce-e1a450ca5b57'
+          value: subscription().subscriptionId
         }
         {
           name: 'AZURE_RESOURCE_GROUP'
-          value: 'azure-sdk-qa-bot'
+          value: resourceGroup().name
         }
         {
           name: 'AI_PROJECT_NAME'
-          value: 'qzqabot-ai'
+          value: aiProjectName
         }
         {
           name: 'AZURE_AI_RESOURCE_NAME'
-          value: 'qzqabot-ai-resource'
+          value: aiResourceName
         }
         {
           name: 'APP_INSIGHTS_CONNECTION_STRING'
-          value: ''
+          value: slotAppInsights.properties.ConnectionString
         }
         {
           name: 'COSMOS_DB_ACCOUNT_NAME'
-          value: 'qzqabot-db'
+          value: cosmosDbAccountName
         }
         {
           name: 'STORAGE_ACCOUNT_NAME'
-          value: 'qzqabotstorage'
+          value: storageAccountName
         }
       ]
     }
   }
   identity: {
     type: 'UserAssigned'
-    userAssignedIdentities: {
-      '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.ManagedIdentity/userAssignedIdentities/qzqabot-identity': {}
-      '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.ManagedIdentity/userAssignedIdentities/azsdkqabot': {}
-    }
+    userAssignedIdentities: siteUserAssignedIdentities
   }
   kind: 'app,linux,container'
 }
 
-resource metricAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
+resource serverMetricAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
   name: 'azuresdkqabot-alert'
   location: 'global'
   properties: {
@@ -335,10 +286,10 @@ resource metricAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
     evaluationFrequency: 'PT1M'
     autoMitigate: true
     targetResourceType: 'Microsoft.Web/sites'
-    targetResourceRegion: 'westus2'
+    targetResourceRegion: location
     actions: [
       {
-        actionGroupId: '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.Insights/actionGroups/azuresdkqabot-alert'
+        actionGroupId: resourceId('Microsoft.Insights/actionGroups', actionGroupName)
         webHookProperties: {}
       }
     ]
@@ -362,7 +313,7 @@ resource metricAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
   }
 }
 
-resource metricAlert2 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
+resource slotMetricAlert 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
   name: 'azuresdkqabot-agent-alert'
   location: 'global'
   properties: {
@@ -374,10 +325,10 @@ resource metricAlert2 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
     evaluationFrequency: 'PT1M'
     autoMitigate: true
     targetResourceType: 'Microsoft.Web/sites/slots'
-    targetResourceRegion: 'westus2'
+    targetResourceRegion: location
     actions: [
       {
-        actionGroupId: '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.Insights/actionGroups/azuresdkqabot-alert'
+        actionGroupId: resourceId('Microsoft.Insights/actionGroups', actionGroupName)
         webHookProperties: {}
       }
     ]
@@ -400,3 +351,6 @@ resource metricAlert2 'Microsoft.Insights/metricAlerts@2024-03-01-preview' = {
     }
   }
 }
+
+// Output
+output serverBaseUrl string = 'https://${slot.properties.defaultHostName}'

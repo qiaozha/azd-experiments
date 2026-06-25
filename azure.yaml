@@ -11,8 +11,10 @@ infra:
 
 # ── Application services ───────────────────────────────────────────────────────
 # Only layers that run application code are declared here.
-# The infra-only layers (shared-resources, agent, backend, logic-app) are
-# deployed by the postprovision hook via the lib/layers.ts pipeline.
+# The infra-only layers (shared-resources, agent-platform, backend, logic-app)
+# are deployed by the postprovision hook via the lib/layers.ts pipeline.
+# The `agent` service below deploys the hosted Foundry agent *app* on top of
+# that platform via the agent.yaml flow (azd deploy agent).
 services:
   frontend:
     # Teams bot — App Service running the bot Docker container.
@@ -50,6 +52,41 @@ services:
           interactive: true
           continueOnError: false
 
+  agent:
+    # Hosted Chat Agent — runs on Microsoft Foundry as a container agent.
+    # azd deploy agent  →  builds the agent container and deploys it to the
+    # Foundry project (provisioned by the agent-platform layer), driven by the
+    # agent.yaml in the project directory (the agent.yaml flow).
+    #
+    # The agent definition lives in a separate repo. `project` points at the
+    # folder that contains agent.yaml + the container Dockerfile + init.py
+    # entry point (ResponsesHostServer, Responses protocol).
+    project: ../azure-sdk-tools/tools/sdk-ai-bots/azure-sdk-qa-bot-agent/agents/chat_agent
+    language: python
+    host: azure.ai.agent
+    config:
+      # What `azd ai agent run` executes locally (the init.py entry point).
+      startupCommand: "python init.py"
+      # Deployment-time container resources; keep aligned with agent.yaml.
+      container:
+        resources:
+          cpu: "1"
+          memory: "2Gi"
+      # NOTE: model deployments (config.deployments[]) are intentionally omitted.
+      # The agent-platform Bicep layer (infra/qaBotAgent/component.bicep) already
+      # provisions the Foundry models — declaring them here would double-provision.
+    hooks:
+      predeploy:
+        - shell: sh
+          run: npx tsx hooks/agent-predeploy.ts
+          interactive: true
+          continueOnError: false
+      postdeploy:
+        - shell: sh
+          run: npx tsx hooks/agent-postdeploy.ts
+          interactive: true
+          continueOnError: false
+
 # ── Global lifecycle hooks ─────────────────────────────────────────────────────
 hooks:
   # ── Pre-provision: runs before 'azd provision' ────────────────────────────
@@ -60,7 +97,7 @@ hooks:
       continueOnError: false
 
   # ── Post-provision: runs the infra-only layer pipeline ────────────────────
-  # Deploys: shared-resources → agent → backend → logic-app
+  # Deploys: shared-resources → agent-platform → backend → logic-app
   # Set DEPLOY_LAYER=<name> to run a single layer only.
   postprovision:
     - shell: sh

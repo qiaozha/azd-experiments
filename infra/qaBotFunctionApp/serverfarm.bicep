@@ -1,8 +1,23 @@
 targetScope = 'resourceGroup'
 
+@description('Azure region for the Function App, plan, and Application Insights.')
+param location string
+
+@description('Container image (registry/repository:tag) the Function App runs.')
+param containerImage string
+
+@description('Client ID of the user-assigned managed identity the Function App runs as.')
+param managedIdentityClientId string
+
+@description('Storage account name used by the Functions runtime (identity-based AzureWebJobsStorage).')
+param storageAccountName string
+
+@description('Resource ID of the user-assigned managed identity the Function App runs as.')
+param managedIdentityResourceId string
+
 resource serverfarm 'Microsoft.Web/serverfarms@2025-05-01' = {
   name: 'azuresdkqabot-functionserviceplan'
-  location: 'West US 2'
+  location: location
   properties: {
     elasticScaleEnabled: true
     maximumElasticWorkerCount: 20
@@ -18,29 +33,40 @@ resource serverfarm 'Microsoft.Web/serverfarms@2025-05-01' = {
   kind: 'elastic'
 }
 
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' = {
+  name: 'azuresdkqabot-function-log'
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
+  }
+}
+
 resource component 'Microsoft.Insights/components@2020-02-02' = {
   name: 'azuresdkqabot-function'
-  location: 'westus2'
+  location: location
   kind: 'web'
   properties: {
     Application_Type: 'web'
     RetentionInDays: 90
-    WorkspaceResourceId: '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/defaultresourcegroup-wus2/providers/microsoft.operationalinsights/workspaces/defaultworkspace-faa080af-c1d8-40ad-9cce-e1a450ca5b57-wus2'
+    WorkspaceResourceId: workspace.id
   }
 }
 
 resource site 'Microsoft.Web/sites@2025-05-01' = {
   name: 'azuresdkqabot-function'
   tags: {
-    'hidden-link: /app-insights-resource-id': '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/microsoft.insights/components/azuresdkqabot-function'
+    'hidden-link: /app-insights-resource-id': component.id
   }
-  location: 'West US 2'
+  location: location
   properties: {
     httpsOnly: true
     publicNetworkAccess: 'Enabled'
     serverFarmId: serverfarm.id
     siteConfig: {
-      linuxFxVersion: 'DOCKER|qzqabotcontainer.azurecr.io/azure-sdk-qa-bot-function:latest'
+      linuxFxVersion: 'DOCKER|${containerImage}'
       alwaysOn: false
       acrUseManagedIdentityCreds: true
       ftpsState: 'FtpsOnly'
@@ -49,19 +75,19 @@ resource site 'Microsoft.Web/sites@2025-05-01' = {
       appSettings: [
         {
           name: 'AZURE_CLIENT_ID'
-          value: ''
+          value: managedIdentityClientId
         }
         {
           name: 'AZURE_TENANT_ID'
-          value: ''
+          value: tenant().tenantId
         }
         {
           name: 'AZURE_SUBSCRIPTION_ID'
-          value: 'faa080af-c1d8-40ad-9cce-e1a450ca5b57'
+          value: subscription().subscriptionId
         }
         {
           name: 'STORAGE_ACCOUNT_NAME'
-          value: 'qzqabotstorage'
+          value: storageAccountName
         }
         {
           name: 'KEY_VAULT_NAME'
@@ -73,15 +99,23 @@ resource site 'Microsoft.Web/sites@2025-05-01' = {
         }
         {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-          value: ''
+          value: component.properties.InstrumentationKey
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: ''
+          value: component.properties.ConnectionString
         }
         {
-          name: 'AzureWebJobsStorage'
-          value: ''
+          name: 'AzureWebJobsStorage__accountName'
+          value: storageAccountName
+        }
+        {
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
+        }
+        {
+          name: 'AzureWebJobsStorage__clientId'
+          value: managedIdentityClientId
         }
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
@@ -90,14 +124,6 @@ resource site 'Microsoft.Web/sites@2025-05-01' = {
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: '~4'
-        }
-        {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: ''
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: 'azuresdkqabot-function'
         }
       ]
       cors: {
@@ -111,72 +137,11 @@ resource site 'Microsoft.Web/sites@2025-05-01' = {
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '/subscriptions/faa080af-c1d8-40ad-9cce-e1a450ca5b57/resourceGroups/azure-sdk-qa-bot/providers/Microsoft.ManagedIdentity/userAssignedIdentities/qzqabot-identity': {}
+      '${managedIdentityResourceId}': {}
     }
   }
   kind: 'functionapp,linux,container'
 }
 
-resource function 'Microsoft.Web/sites/functions@2025-05-01' = {
-  name: 'adoTokenRefresh'
-  parent: site
-  properties: {
-    script_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/site/wwwroot/index.js'
-    test_data_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/data/Functions/sampledata/adoTokenRefresh.dat'
-    href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/functions/adoTokenRefresh'
-    language: 'node'
-    isDisabled: false
-  }
-}
-
-resource function2 'Microsoft.Web/sites/functions@2025-05-01' = {
-  name: 'channels'
-  parent: site
-  properties: {
-    script_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/site/wwwroot/index.js'
-    test_data_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/data/Functions/sampledata/channels.dat'
-    href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/functions/channels'
-    invoke_url_template: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/api/channels'
-    language: 'node'
-    isDisabled: false
-  }
-}
-
-resource function3 'Microsoft.Web/sites/functions@2025-05-01' = {
-  name: 'convertActivity'
-  parent: site
-  properties: {
-    script_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/site/wwwroot/index.js'
-    test_data_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/data/Functions/sampledata/convertActivity.dat'
-    href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/functions/convertActivity'
-    invoke_url_template: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/api/convertactivity'
-    language: 'node'
-    isDisabled: false
-  }
-}
-
-resource function4 'Microsoft.Web/sites/functions@2025-05-01' = {
-  name: 'feedbacks'
-  parent: site
-  properties: {
-    script_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/site/wwwroot/index.js'
-    test_data_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/data/Functions/sampledata/feedbacks.dat'
-    href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/functions/feedbacks'
-    invoke_url_template: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/api/feedbacks'
-    language: 'node'
-    isDisabled: false
-  }
-}
-
-resource function5 'Microsoft.Web/sites/functions@2025-05-01' = {
-  name: 'records'
-  parent: site
-  properties: {
-    script_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/site/wwwroot/index.js'
-    test_data_href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/vfs/home/data/Functions/sampledata/records.dat'
-    href: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/admin/functions/records'
-    invoke_url_template: 'https://azuresdkqabot-function-apa6h3fnf5hye9gc.westus2-01.azurewebsites.net/api/records'
-    language: 'node'
-    isDisabled: false
-  }
-}
+// Output
+output functionAppName string = site.name

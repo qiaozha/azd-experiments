@@ -10,7 +10,7 @@
  *
  * Partial deployment:
  *   Set the DEPLOY_LAYER env var to run a single layer, e.g.:
- *     DEPLOY_LAYER=agent azd provision
+ *     DEPLOY_LAYER=agent-platform azd provision
  */
 
 export interface LayerContext {
@@ -34,10 +34,12 @@ const BICEP_BASE = "../infra";
 
 export const INFRA_LAYERS: Layer[] = [
   // ── Layer 1: Shared resources ──────────────────────────────────────────────
-  // Creates: managed identity, Log Analytics workspace, action group, Key Vault.
+  // Creates: managed identity, storage account, container registry, Cosmos DB,
+  // Key Vault, App Configuration, Search, Log Analytics, action group, and their
+  // RBAC role assignments.
   {
     name: "shared-resources",
-    bicepFile: `${BICEP_BASE}/qaBotSharedResources/userAssignedIdentity.bicep`,
+    bicepFile: `${BICEP_BASE}/qaBotSharedResources/sharedResources.bicep`,
     pre: async (ctx) => {
       // TODO: Check Key Vault name 'azuresdkqabot-keyvalut' is not soft-deleted.
       //   az keyvault list-deleted --query "[?name=='azuresdkqabot-keyvalut']"
@@ -50,10 +52,12 @@ export const INFRA_LAYERS: Layer[] = [
     },
   },
 
-  // ── Layer 2: Agent / AI services ──────────────────────────────────────────
-  // Creates: Application Insights, Azure AI Services account, model deployments.
+  // ── Layer 2: Agent platform / AI services ─────────────────────────────────
+  // Creates: Application Insights, Azure AI Services account, Foundry project,
+  // and model deployments. This is the *platform* the hosted agent runs on; the
+  // agent app itself is deployed separately via `azd deploy agent` (agent.yaml).
   {
-    name: "agent",
+    name: "agent-platform",
     bicepFile: `${BICEP_BASE}/qaBotAgent/component.bicep`,
     pre: async (ctx) => {
       // TODO: Verify Cognitive Services quota in 'swedencentral' is sufficient.
